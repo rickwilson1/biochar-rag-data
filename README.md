@@ -13,36 +13,80 @@ Data files for the Biochar RAG system. These files are tracked with Git LFS.
 
 ---
 
-## GCP VM Setup (First Time)
+## GitHub Repos Overview
+
+| Repo | Purpose | Location |
+|------|---------|----------|
+| `biochar-rag-data` | Data files (LFS) | GCP VM: `~/biochar-rag/data/` |
+| `biochar-rag` | GCP code (api + app) | GCP VM: `~/biochar-rag/code/` |
+| `biochar-rag-api` | Render API (deprecated) | Render |
+| `biochar-rag-app` | Render App (deprecated) | Render |
+
+---
+
+## GCP VM First-Time Setup
 
 ### 1. SSH into your VM
 ```bash
 gcloud compute ssh rickwilson@biochar-rag-vm --zone=us-west1-b
 ```
 
-### 2. Install Git LFS
+### 2. Install dependencies
 ```bash
-sudo apt-get update && sudo apt-get install -y git-lfs
+sudo apt-get update && sudo apt-get install -y git-lfs gh
 git lfs install
 ```
 
-### 3. Clone the data repo
+### 3. Authenticate with GitHub
+```bash
+gh auth login
+# Select: GitHub.com → HTTPS → Yes → Login with browser
+# Open the URL on your Mac and enter the code shown
+```
+
+### 4. Clone the data repo
 ```bash
 cd ~/biochar-rag
-rm -rf data  # Remove old data directory if exists
+rm -rf data
 git clone https://github.com/rickwilson1/biochar-rag-data.git data
+cd data && tar -xzf attachments.tar.gz
 ```
 
-### 4. Extract attachments
+### 5. Clone the code repo
 ```bash
-cd data
-tar -xzf attachments.tar.gz
+cd ~/biochar-rag
+mv api api_backup
+mv app app_backup
+gh repo clone rickwilson1/biochar-rag code
+ln -s code/api api
+ln -s code/app app
 ```
 
-### 5. Verify and restart
+### 6. Restart services
 ```bash
-ls -lh  # Should show all files
 sudo systemctl restart biochar-api
+sudo systemctl restart biochar-app
+sudo systemctl status biochar-api
+```
+
+### 7. Test
+Visit https://biocharai.org
+
+---
+
+## Updating Code on VM
+
+When you push code changes to GitHub:
+
+```bash
+# On your Mac
+cd ~/Documents/PyProjects/biochar_rag/gcp-deploy
+git add -A && git commit -m "Your message" && git push
+
+# On the VM
+cd ~/biochar-rag/code
+git pull
+sudo systemctl restart biochar-api biochar-app
 ```
 
 ---
@@ -52,6 +96,7 @@ sudo systemctl restart biochar-api
 When you push new embeddings to GitHub:
 
 ```bash
+# On the VM
 cd ~/biochar-rag/data
 git pull
 tar -xzf attachments.tar.gz  # Re-extract if attachments changed
@@ -68,10 +113,10 @@ When embeddings are regenerated locally:
 cd ~/Documents/PyProjects/biochar_rag/biochar-rag-data
 
 # Copy new files
-cp /path/to/new/embeddings.npy .
-cp /path/to/new/faiss.index .
-cp /path/to/new/chunks.parquet .
-cp /path/to/new/attachments.tar.gz .  # If attachments changed
+cp ../data/embeddings_output/combined/embeddings.npy .
+cp ../data/embeddings_output/combined/faiss.index .
+cp ../data/embeddings_output/combined/chunks.parquet .
+cp ../data/intermediate/attachments.tar.gz .  # If attachments changed
 
 # Push to GitHub
 git add -A
@@ -85,12 +130,26 @@ git push
 
 ```
 ~/biochar-rag/
-├── api/           # API code (from biochar-rag-api)
-├── app/           # App code (from biochar-rag-app)  
-├── data/          # Data files (from biochar-rag-data)
+├── api -> code/api        # Symlink to code repo
+├── app -> code/app        # Symlink to code repo
+├── code/                  # From biochar-rag repo (GitHub)
+│   ├── api/
+│   │   ├── main.py
+│   │   ├── rag_core.py
+│   │   └── email_store.py
+│   └── app/
+│       └── app.py
+├── data/                  # From biochar-rag-data repo (GitHub LFS)
 │   ├── embeddings.npy
 │   ├── faiss.index
 │   ├── chunks.parquet
 │   ├── attachments.tar.gz
-│   └── attachments/   # Extracted attachment files
+│   └── attachments/       # Extracted PDFs/images
+└── venv/                  # Python virtual environment
 ```
+
+---
+
+## Live Site
+
+**https://biocharai.org**
